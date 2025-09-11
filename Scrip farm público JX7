@@ -1,0 +1,571 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/memejames/elerium-v2-ui-library/main/Library", true))()
+
+-- Servicios (sin repeticiones)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+local StarterPack = game:GetService("StarterPack")
+
+-- Player
+local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
+
+-- Variables globales
+_G.whitelistedPlayers = _G.whitelistedPlayers or {}
+if not table.find(_G.whitelistedPlayers, "MissSherya") then
+    table.insert(_G.whitelistedPlayers, "MissSherya")
+end
+
+local connections = {}
+local allActive = false
+
+-- Función para manejar errores
+local function safeCall(func, ...)
+    local success, error = pcall(func, ...)
+    if not success then
+        warn("Error en script: " .. tostring(error))
+    end
+    return success
+end
+
+-- UI Window
+local window = library:AddWindow("Sherya Script", {
+    main_color = Color3.fromRGB(75, 0, 130),
+    min_size = Vector2.new(600, 650),
+    can_resize = true,
+})
+
+local mainTab = window:AddTab("Main")
+local farmTab = window:AddTab("Farm")
+local miscTab = window:AddTab("Misc")
+local pets = window:AddTab("Pets")
+local Stats = window:AddTab("Stats")
+local calculator = window:AddTab("Calculator")
+local Killing = window:AddTab("Killer")
+local Teleport = window:AddTab("Teleport")
+local creditsTab = window:AddTab("Credits")
+
+-- ============================================================================
+-- MAIN TAB
+-- ============================================================================
+
+-- Auto Brawls Folder
+local BrawlFolder = mainTab:AddFolder("  Auto Brawls")
+
+local godModeToggle = false
+BrawlFolder:AddSwitch("God Mode (Brawl)", function(State)
+    godModeToggle = State
+    if State then
+        task.spawn(function()
+            while godModeToggle do
+                game:GetService("ReplicatedStorage").rEvents.brawlEvent:FireServer("joinBrawl")
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+local whitelist = {} 
+
+local autoWinBrawlToggle = BrawlFolder:AddSwitch("Auto Win Brawls", function(bool)
+    getgenv().autoWinBrawl = bool
+
+    local function equipPunch()
+        if not getgenv().autoWinBrawl then return end
+        local character = game.Players.LocalPlayer.Character
+        if not character then return false end
+        if character:FindFirstChild("Punch") then return true end
+        local backpack = game.Players.LocalPlayer.Backpack
+        if not backpack then return false end
+        for _, tool in pairs(backpack:GetChildren()) do
+            if tool.ClassName == "Tool" and tool.Name == "Punch" then
+                tool.Parent = character
+                return true
+            end
+        end
+        return false
+    end
+
+    local function isValidTarget(player)
+        if not player or not player.Parent then return false end
+        if player == Players.LocalPlayer then return false end
+        if _G.whitelistedPlayers and table.find(_G.whitelistedPlayers, player.Name) then return false end
+        local character = player.Character
+        if not character or not character.Parent then return false end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid then return false end
+        if not humanoid.Health or humanoid.Health <= 0 then return false end
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead then return false end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart or not rootPart.Parent then return false end
+        return true
+    end
+
+    local function isLocalPlayerReady()
+        local player = game.Players.LocalPlayer
+        if not player then return false end
+        local character = player.Character
+        if not character or not character.Parent then return false end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then return false end
+        local leftHand = character:FindFirstChild("LeftHand")
+        local rightHand = character:FindFirstChild("RightHand")
+        return (leftHand ~= nil or rightHand ~= nil)
+    end
+
+    local function safeTouchInterest(targetPart, localPart)
+        if not targetPart or not targetPart.Parent then return false end
+        if not localPart or not localPart.Parent then return false end
+        local success = pcall(function()
+            firetouchinterest(targetPart, localPart, 0)
+            task.wait(0.01)
+            firetouchinterest(targetPart, localPart, 1)
+        end)
+        return success
+    end
+
+    if bool then
+        task.spawn(function()
+            while getgenv().autoWinBrawl and task.wait(0.5) do
+                if not getgenv().autoWinBrawl then break end
+                pcall(function()
+                    if game.Players.LocalPlayer.PlayerGui.gameGui.brawlJoinLabel.Visible then
+                        game.ReplicatedStorage.rEvents.brawlEvent:FireServer("joinBrawl")
+                        game.Players.LocalPlayer.PlayerGui.gameGui.brawlJoinLabel.Visible = false
+                    end
+                end)
+            end
+        end)
+
+        task.spawn(function()
+            while getgenv().autoWinBrawl and task.wait(0.5) do
+                if not getgenv().autoWinBrawl then break end
+                equipPunch()
+            end
+        end)
+
+        task.spawn(function()
+            while getgenv().autoWinBrawl and task.wait(0.1) do
+                if not getgenv().autoWinBrawl then break end
+                if isLocalPlayerReady() and game.ReplicatedStorage.brawlInProgress.Value then
+                    local player = game.Players.LocalPlayer
+                    pcall(function() player.muscleEvent:FireServer("punch", "rightHand") end)
+                    pcall(function() player.muscleEvent:FireServer("punch", "leftHand") end)
+                end
+            end
+        end)
+
+        task.spawn(function()
+            while getgenv().autoWinBrawl and task.wait(0.05) do
+                if not getgenv().autoWinBrawl then break end
+                if isLocalPlayerReady() and game.ReplicatedStorage.brawlInProgress.Value then
+                    local character = game.Players.LocalPlayer.Character
+                    local leftHand = character:FindFirstChild("LeftHand")
+                    local rightHand = character:FindFirstChild("RightHand")
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if not getgenv().autoWinBrawl then break end
+                        pcall(function()
+                            if isValidTarget(player) then
+                                local targetRoot = player.Character.HumanoidRootPart
+                                if leftHand then
+                                    safeTouchInterest(targetRoot, leftHand)
+                                end
+                                if rightHand then
+                                    safeTouchInterest(targetRoot, rightHand)
+                                end
+                            end
+                        end)
+                        task.wait(0.01)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+BrawlFolder:AddSwitch("Auto Join Brawls", function(bool)
+    getgenv().autoJoinBrawl = bool
+    if bool then
+        task.spawn(function()
+            while getgenv().autoJoinBrawl and task.wait(0.5) do
+                if not getgenv().autoJoinBrawl then break end
+                pcall(function()
+                    if game.Players.LocalPlayer.PlayerGui.gameGui.brawlJoinLabel.Visible then
+                        game.ReplicatedStorage.rEvents.brawlEvent:FireServer("joinBrawl")
+                        game.Players.LocalPlayer.PlayerGui.gameGui.brawlJoinLabel.Visible = false
+                    end
+                end)
+            end
+        end)
+    end
+end)
+
+-- Jungle Gym Folder
+local jungleGymFolder = mainTab:AddFolder("  Jungle Gym")
+
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, "E", false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, "E", false, game)
+end
+
+local function autoLift()
+    while getgenv().working do
+        LocalPlayer.muscleEvent:FireServer("rep")
+        task.wait(0.1)
+    end
+end
+
+local function teleportAndStart(machineName, position)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = position
+        task.wait(0.1)
+        pressE()
+        task.spawn(autoLift)
+    end
+end
+
+jungleGymFolder:AddSwitch("Jungle Bench Press", function(bool)
+    if getgenv().working and not bool then
+        getgenv().working = false
+        return
+    end
+    getgenv().working = bool
+    if bool then
+        teleportAndStart("Bench Press", CFrame.new(-8173, 64, 1898))
+    end
+end)
+
+jungleGymFolder:AddSwitch("Jungle Squat", function(bool)
+    if getgenv().working and not bool then
+        getgenv().working = false
+        return
+    end
+    getgenv().working = bool
+    if bool then
+        teleportAndStart("Squat", CFrame.new(-8352, 34, 2878))
+    end
+end)
+
+jungleGymFolder:AddSwitch("Jungle Pull Ups", function(bool)
+    if getgenv().working and not bool then
+        getgenv().working = false
+        return
+    end
+    getgenv().working = bool
+    if bool then
+        teleportAndStart("Pull Up", CFrame.new(-8666, 34, 2070))
+    end
+end)
+
+jungleGymFolder:AddSwitch("Jungle Boulder", function(bool)
+    if getgenv().working and not bool then
+        getgenv().working = false
+        return
+    end
+    getgenv().working = bool
+    if bool then
+        teleportAndStart("Boulder", CFrame.new(-8621, 34, 2684))
+    end
+end)
+
+-- All Gyms Folder
+local farmGymsFolder = mainTab:AddFolder("  All Gyms")
+
+local workoutPositions = {
+    ["Bench Press"] = {
+        ["Eternal Gym"] = CFrame.new(-7176.19141, 45.394104, -1106.31421),
+        ["Legend Gym"] = CFrame.new(4111.91748, 1020.46674, -3799.97217),
+        ["Muscle King Gym"] = CFrame.new(-8590.06152, 46.0167427, -6043.34717)
+    },
+    ["Squat"] = {
+        ["Eternal Gym"] = CFrame.new(-7176.19141, 45.394104, -1106.31421),
+        ["Legend Gym"] = CFrame.new(4304.99023, 987.829956, -4124.2334),
+        ["Muscle King Gym"] = CFrame.new(-8940.12402, 13.1642084, -5699.13477)
+    },
+    ["Deadlift"] = {
+        ["Eternal Gym"] = CFrame.new(-7176.19141, 45.394104, -1106.31421),
+        ["Legend Gym"] = CFrame.new(4304.99023, 987.829956, -4124.2334),
+        ["Muscle King Gym"] = CFrame.new(-8940.12402, 13.1642084, -5699.13477)
+    },
+    ["Pull Up"] = {
+        ["Eternal Gym"] = CFrame.new(-7176.19141, 45.394104, -1106.31421),
+        ["Legend Gym"] = CFrame.new(4304.99023, 987.829956, -4124.2334),
+        ["Muscle King Gym"] = CFrame.new(-8940.12402, 13.1642084, -5699.13477)
+    }
+}
+
+local workoutTypes = {"Bench Press", "Squat", "Deadlift", "Pull Up"}
+local gymLocations = {"Eternal Gym", "Legend Gym", "Muscle King Gym"}
+local workoutTranslations = {
+    ["Bench Press"] = "Bench Press",
+    ["Squat"] = "Squat", 
+    ["Deadlift"] = "Dead Lift",
+    ["Pull Up"] = "Pull Up"
+}
+
+local gymToggles = {}
+local selectedGym = {}
+
+for _, workoutType in ipairs(workoutTypes) do
+    local spanishWorkoutName = workoutTranslations[workoutType]
+    
+    local dropdown = farmGymsFolder:AddDropdown(spanishWorkoutName .. " - Gym", function(selected)
+        selectedGym[workoutType] = selected
+    end)
+    
+    for _, gymName in ipairs(gymLocations) do
+        dropdown:Add(gymName)
+    end
+    
+    local toggle = farmGymsFolder:AddSwitch(spanishWorkoutName, function(bool)
+        getgenv().workingGym = bool
+        getgenv().currentWorkoutType = workoutType
+        
+        if bool then
+            local selectedGymName = selectedGym[workoutType] or gymLocations[1]
+            
+            if workoutPositions[workoutType] and workoutPositions[workoutType][selectedGymName] then
+                for otherType, otherToggle in pairs(gymToggles) do
+                    if otherType ~= workoutType and otherToggle then
+                        otherToggle:Set(false)
+                    end
+                end
+                teleportAndStart(workoutType, workoutPositions[workoutType][selectedGymName])
+            end
+        end
+    end)
+    
+    gymToggles[workoutType] = toggle
+end
+
+-- Auto Snack Folder
+local autoSnackFolder = mainTab:AddFolder("  Auto Snacks")
+
+local activeSnacks = {
+    ["Protein Shake"] = false,
+    ["Energy Shake"] = false,
+    ["TOUGH Bar"] = false,
+    ["ULTRA Shake"] = false,
+    ["Energy Bar"] = false,
+    ["Protein Egg"] = false,
+    ["Tropical Shake"] = false,
+}
+
+local snackConnections = {}
+
+local function equipAndUse(itemName)
+    local character = player.Character
+    local backpack = player.Backpack
+    
+    if not character or not backpack then return end
+    
+    local tool = backpack:FindFirstChild(itemName)
+    
+    if tool then
+        tool.Parent = character
+        task.wait(0.1)
+        
+        local equippedTool = character:FindFirstChild(itemName)
+        if equippedTool then
+            equippedTool:Activate()
+            
+            local viewportSize = workspace.CurrentCamera.ViewportSize
+            local x, y = viewportSize.X / 2, viewportSize.Y / 2
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+            task.wait(0.01)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        end
+    end
+end
+
+local function startSnackLoop(itemName)
+    if snackConnections[itemName] then
+        task.cancel(snackConnections[itemName])
+        snackConnections[itemName] = nil
+    end
+    
+    snackConnections[itemName] = task.spawn(function()
+        while activeSnacks[itemName] do
+            local backpack = player.Backpack
+            
+            if backpack and backpack:FindFirstChild(itemName) then
+                equipAndUse(itemName)
+                task.wait(0.5)
+            else
+                activeSnacks[itemName] = false
+                print("No more " .. itemName .. " available!")
+                break
+            end
+            
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function startProteinEggLoop()
+    if snackConnections["Protein Egg"] then
+        task.cancel(snackConnections["Protein Egg"])
+        snackConnections["Protein Egg"] = nil
+    end
+    
+    snackConnections["Protein Egg"] = task.spawn(function()
+        while activeSnacks["Protein Egg"] do
+            local backpack = player.Backpack
+            
+            if backpack and backpack:FindFirstChild("Protein Egg") then
+                equipAndUse("Protein Egg")
+                print("Protein Egg usado! Esperando 30 minutos...")
+                task.wait(1800)
+            else
+                activeSnacks["Protein Egg"] = false
+                print("No more Protein Egg available!")
+                break
+            end
+        end
+    end)
+end
+
+local function startTropicalShakeLoop()
+    if snackConnections["Tropical Shake"] then
+        task.cancel(snackConnections["Tropical Shake"])
+        snackConnections["Tropical Shake"] = nil
+    end
+    
+    snackConnections["Tropical Shake"] = task.spawn(function()
+        while activeSnacks["Tropical Shake"] do
+            local backpack = player.Backpack
+            
+            if backpack and backpack:FindFirstChild("Tropical Shake") then
+                equipAndUse("Tropical Shake")
+                print("Tropical Shake usado! Esperando 15 minutos...")
+                task.wait(900)
+            else
+                activeSnacks["Tropical Shake"] = false
+                print("No more Tropical Shake available!")
+                break
+            end
+        end
+    end)
+end
+
+local function stopSnackLoop(itemName)
+    if snackConnections[itemName] then
+        task.cancel(snackConnections[itemName])
+        snackConnections[itemName] = nil
+    end
+end
+
+for _, snackName in pairs({"Protein Shake", "Energy Shake", "Tough Bar", "Ultra Shake", "Energy Bar"}) do
+    local displayName = snackName == "Tough Bar" and "TOUGH Bar" or (snackName == "Ultra Shake" and "ULTRA Shake" or snackName)
+    
+    autoSnackFolder:AddSwitch(snackName, function(state)
+        activeSnacks[displayName] = state
+        if state then
+            startSnackLoop(displayName)
+        else
+            stopSnackLoop(displayName)
+        end
+    end)
+end
+
+autoSnackFolder:AddSwitch("Protein Egg 30 Minuts", function(state)
+    activeSnacks["Protein Egg"] = state
+    if state then
+        startProteinEggLoop()
+    else
+        stopSnackLoop("Protein Egg")
+    end
+end)
+
+autoSnackFolder:AddSwitch("Tropical Shake 15 Minuts", function(state)
+    activeSnacks["Tropical Shake"] = state
+    if state then
+        startTropicalShakeLoop()
+    else
+        stopSnackLoop("Tropical Shake")
+    end
+end)
+
+-- Extras Folder
+local MSCCFolder = mainTab:AddFolder("  Extras")
+
+MSCCFolder:AddSwitch("Lock Position", function(Value)
+    if Value then
+        local currentPos = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+        getgenv().posLock = game:GetService("RunService").Heartbeat:Connect(function()
+            if game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = currentPos
+            end
+        end)
+    else
+        if getgenv().posLock then
+            getgenv().posLock:Disconnect()
+            getgenv().posLock = nil
+        end
+    end
+end)
+
+MSCCFolder:AddSwitch("Anti Knockback", function(Value)
+    safeCall(function()
+        if Value then
+            local playerName = game.Players.LocalPlayer.Name
+            local rootPart = game.Workspace:FindFirstChild(playerName):FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.MaxForce = Vector3.new(100000, 0, 100000)
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                bodyVelocity.P = 1250
+                bodyVelocity.Parent = rootPart
+            end
+        else
+            local playerName = game.Players.LocalPlayer.Name
+            local character = game.Workspace:FindFirstChild(playerName)
+            if character then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    local existingVelocity = rootPart:FindFirstChild("BodyVelocity")
+                    if existingVelocity and existingVelocity.MaxForce == Vector3.new(100000, 0, 100000) then
+                        existingVelocity:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+MSCCFolder:AddButton("Anti AFK", function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Anti AFK",
+        Text = "Anti AFK se ha activado correctamente!",
+        Duration = 3,
+        Button1 = "OK"
+    })
+    
+    local GC = getconnections or get_signal_cons
+    if GC then
+        for i, v in pairs(GC(game.Players.LocalPlayer.Idled)) do
+            if v["Disable"] then
+                v["Disable"](v)
+            elseif v["Disconnect"] then
+                v["Disconnect"](v)
+            end
+        end
+    else
+        local VirtualUser = game:GetService("VirtualUser")
+        game:GetService("Players").LocalPlayer.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+    
+    task.spawn(function()
+        while task.wait(30) do
+            local VirtualUser = game:GetService("VirtualUser")
+            Virtu
